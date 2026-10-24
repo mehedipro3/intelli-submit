@@ -2,7 +2,24 @@
 
 import { useState, useEffect } from "react";
 
-export default function DocumentPreviewer({ fileUrl, fileObj, fileName, className = "" }) {
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+
+// Normalize file URLs: ensure any localhost or relative URL routes through the current active API_BASE
+const normalizeUrl = (url) => {
+  if (!url) return url;
+  if (url.startsWith("blob:") || url.startsWith("data:")) return url;
+  try {
+    const parsed = new URL(url);
+    if (parsed.pathname) {
+      return `${API_BASE}${parsed.pathname}${parsed.search}`;
+    }
+  } catch {
+    return url.startsWith("/") ? `${API_BASE}${url}` : `${API_BASE}/${url}`;
+  }
+  return url;
+};
+
+export default function DocumentPreviewer({ fileUrl, fileObj, fileName, className = "", downloadUrl }) {
   const [docHtml, setDocHtml] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -12,7 +29,10 @@ export default function DocumentPreviewer({ fileUrl, fileObj, fileName, classNam
   // Determine file type and URL
   const effectiveFileName = fileName || fileObj?.name || (fileUrl ? fileUrl.split("/").pop() : "document");
   const ext = effectiveFileName.split(".").pop()?.toLowerCase();
-  const effectiveUrl = fileUrl || (fileObj ? URL.createObjectURL(fileObj) : null);
+
+  const rawUrl = fileUrl || (fileObj ? URL.createObjectURL(fileObj) : null);
+  const effectiveUrl = fileObj ? rawUrl : normalizeUrl(rawUrl);
+  const effectiveDownloadUrl = downloadUrl ? normalizeUrl(downloadUrl) : effectiveUrl;
 
   useEffect(() => {
     let isMounted = true;
@@ -35,8 +55,8 @@ export default function DocumentPreviewer({ fileUrl, fileObj, fileName, classNam
           let arrayBuffer;
           if (fileObj) {
             arrayBuffer = await fileObj.arrayBuffer();
-          } else if (fileUrl) {
-            const res = await fetch(fileUrl);
+          } else if (effectiveUrl) {
+            const res = await fetch(effectiveUrl);
             if (!res.ok) throw new Error("Failed to load document file");
             arrayBuffer = await res.arrayBuffer();
           }
@@ -48,8 +68,7 @@ export default function DocumentPreviewer({ fileUrl, fileObj, fileName, classNam
               setDocHtml(result.value || "<p><em>Document contains no readable text content.</em></p>");
             }
           }
-        } catch (err) {
-          console.error("DOCX rendering error:", err);
+        } catch {
           if (isMounted) {
             setError("Could not render DOCX preview. You can still download the file directly.");
           }
@@ -68,16 +87,16 @@ export default function DocumentPreviewer({ fileUrl, fileObj, fileName, classNam
     return () => {
       isMounted = false;
     };
-  }, [fileUrl, fileObj, ext]);
+  }, [effectiveUrl, fileObj, ext]);
 
   return (
-    <div className={`flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm ${className}`}>
-      {/* Viewer Header / Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/40">
+    <div className={`flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm ${className}`}>
+      {/* Viewer Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-xs font-bold uppercase">
-            {ext || "DOC"}
-          </div>
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-200 dark:bg-zinc-800 text-xs font-bold uppercase text-zinc-700 dark:text-zinc-300 shrink-0">
+            {ext || "FILE"}
+          </span>
           <div className="min-w-0">
             <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate max-w-xs md:max-w-md">
               {effectiveFileName}
@@ -89,9 +108,9 @@ export default function DocumentPreviewer({ fileUrl, fileObj, fileName, classNam
         </div>
 
         <div className="flex items-center gap-2">
-          {effectiveUrl && (
+          {effectiveDownloadUrl && (
             <a
-              href={effectiveUrl}
+              href={effectiveDownloadUrl}
               download={effectiveFileName}
               target="_blank"
               rel="noopener noreferrer"
@@ -136,9 +155,9 @@ export default function DocumentPreviewer({ fileUrl, fileObj, fileName, classNam
               </svg>
             </div>
             <p className="text-xs font-medium text-zinc-800 dark:text-zinc-200 mb-1">{error}</p>
-            {effectiveUrl && (
+            {effectiveDownloadUrl && (
               <a
-                href={effectiveUrl}
+                href={effectiveDownloadUrl}
                 download={effectiveFileName}
                 className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 rounded-lg hover:opacity-90 transition-opacity"
               >
@@ -181,9 +200,9 @@ export default function DocumentPreviewer({ fileUrl, fileObj, fileName, classNam
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 mb-4 leading-relaxed">
               In-browser preview is available for PDF and modern Word (.docx) files. To inspect this document, please download it or open in Microsoft Word or LibreOffice.
             </p>
-            {effectiveUrl && (
+            {effectiveDownloadUrl && (
               <a
-                href={effectiveUrl}
+                href={effectiveDownloadUrl}
                 download={effectiveFileName}
                 className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm"
               >
@@ -193,13 +212,6 @@ export default function DocumentPreviewer({ fileUrl, fileObj, fileName, classNam
                 Download .doc File
               </a>
             )}
-          </div>
-        )}
-
-        {/* Unknown File Type */}
-        {!loading && !error && previewType === "unknown" && (
-          <div className="p-6 text-center text-xs text-zinc-400">
-            No document selected or unsupported file format.
           </div>
         )}
       </div>

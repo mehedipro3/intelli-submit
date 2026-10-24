@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Bars, Moon, Sun, Magnet, ArrowRightFromSquare, Person, ShieldCheck } from "@gravity-ui/icons";
 import { useSession, signOut } from "@/lib/auth-client";
 
@@ -12,6 +12,16 @@ export default function Navbar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { data: session, isPending } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
+
+  const isDashboard =
+    pathname.startsWith("/author") ||
+    pathname.startsWith("/reviewer") ||
+    pathname.startsWith("/admin");
+
+  if (isDashboard) {
+    return null;
+  }
 
   // Sync theme state with DOM / localStorage on mount
   useEffect(() => {
@@ -70,20 +80,18 @@ export default function Navbar() {
           </Link>
         </div>
 
-        {/* Center: Nav links (Desktop) */}
+        {/* Center: Nav links (Desktop) — only show public links + role-appropriate dashboard */}
         <nav className="hidden md:flex items-center gap-6">
-          <Link href="/author" className="text-sm font-semibold text-zinc-800 transition-colors hover:text-black dark:text-zinc-200 dark:hover:text-white flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400" />
-            Author Portal
-          </Link>
-          <Link href="/reviewer" className="text-sm font-semibold text-zinc-800 transition-colors hover:text-black dark:text-zinc-200 dark:hover:text-white flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400" />
-            Reviewer Portal
-          </Link>
-          <Link href="/admin" className="text-sm font-semibold text-zinc-800 transition-colors hover:text-black dark:text-zinc-200 dark:hover:text-white flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-600 dark:bg-purple-400" />
-            Admin Portal
-          </Link>
+          {user && (
+            <Link href={getDashboardHref()} className="text-sm font-semibold text-zinc-800 transition-colors hover:text-black dark:text-zinc-200 dark:hover:text-white flex items-center gap-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                userRole === "admin" ? "bg-purple-600 dark:bg-purple-400" :
+                userRole === "reviewer" ? "bg-emerald-600 dark:bg-emerald-400" :
+                "bg-blue-600 dark:bg-blue-400"
+              }`} />
+              My Dashboard
+            </Link>
+          )}
           <Link href="/#features" className="text-sm font-medium text-zinc-600 transition-colors hover:text-black dark:text-zinc-400 dark:hover:text-white">
             Features
           </Link>
@@ -160,7 +168,7 @@ export default function Navbar() {
                       </div>
                     </div>
                   </div>
-                  {/* Menu items */}
+                  {/* Menu items — only show role-appropriate dashboard */}
                   <div className="p-1.5">
                     <Link
                       href={getDashboardHref()}
@@ -168,31 +176,7 @@ export default function Navbar() {
                       className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors font-medium"
                     >
                       <Person className="h-4 w-4 text-blue-500" />
-                      My Dashboard ({userRole.toUpperCase()})
-                    </Link>
-                    <Link
-                      href="/author"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
-                    >
-                      <span className="w-2 h-2 rounded-full bg-blue-500" />
-                      Author Portal
-                    </Link>
-                    <Link
-                      href="/reviewer"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
-                    >
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      Reviewer Portal
-                    </Link>
-                    <Link
-                      href="/admin"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
-                    >
-                      <ShieldCheck className="h-4 w-4 text-purple-500" />
-                      Admin Dispatch
+                      My Dashboard
                     </Link>
                     <button
                       onClick={handleSignOut}
@@ -242,18 +226,16 @@ export default function Navbar() {
       {/* Mobile Nav Menu Dropdown */}
       {mobileMenuOpen && (
         <div className="md:hidden border-b border-gray-200 bg-white px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950 flex flex-col gap-3">
-          <Link href="/author" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-zinc-900 dark:text-white py-1 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-600" />
-            Author Portal
-          </Link>
-          <Link href="/reviewer" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-zinc-900 dark:text-white py-1 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-600" />
-            Reviewer Portal
-          </Link>
-          <Link href="/admin" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-zinc-900 dark:text-white py-1 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-purple-600" />
-            Admin Portal
-          </Link>
+          {user && (
+            <Link href={getDashboardHref()} onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-zinc-900 dark:text-white py-1 flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${
+                userRole === "admin" ? "bg-purple-600" :
+                userRole === "reviewer" ? "bg-emerald-600" :
+                "bg-blue-600"
+              }`} />
+              My Dashboard
+            </Link>
+          )}
           <Link href="/#features" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium text-zinc-600 dark:text-zinc-400 py-1">
             Features
           </Link>

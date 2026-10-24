@@ -10,7 +10,7 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("author"); // "author" | "reviewer" | "admin"
+  const [role, setRole] = useState("author"); // "author" | "reviewer"
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -34,8 +34,7 @@ export default function RegisterPage() {
         setSuccess(true);
         // Automatically redirect to role-specific dashboard
         setTimeout(() => {
-          if (role === "admin") router.push("/admin");
-          else if (role === "reviewer") router.push("/reviewer");
+          if (role === "reviewer") router.push("/reviewer");
           else router.push("/author");
         }, 1200);
       }
@@ -50,7 +49,7 @@ export default function RegisterPage() {
     try {
       await signIn.social({
         provider: "google",
-        callbackURL: role === "admin" ? "/admin" : role === "reviewer" ? "/reviewer" : "/author",
+        callbackURL: role === "reviewer" ? "/reviewer" : "/author",
       });
     } catch (err) {
       setError(err.message || "Failed to initiate Google sign up.");
@@ -93,7 +92,7 @@ export default function RegisterPage() {
             <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
               Select Your Role:
             </label>
-            <div className="grid grid-cols-3 gap-1.5 p-1 bg-zinc-100 dark:bg-zinc-800/80 rounded-xl text-xs font-semibold">
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-100 dark:bg-zinc-800/80 rounded-xl text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => setRole("author")}
@@ -116,22 +115,10 @@ export default function RegisterPage() {
               >
                 Reviewer
               </button>
-              <button
-                type="button"
-                onClick={() => setRole("admin")}
-                className={`py-2 rounded-lg transition-all cursor-pointer ${
-                  role === "admin"
-                    ? "bg-white dark:bg-zinc-900 text-purple-600 dark:text-purple-400 shadow-xs"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-                }`}
-              >
-                Admin
-              </button>
             </div>
             <p className="text-[11px] text-zinc-400 mt-1">
               {role === "author" && "Submit manuscripts, view reviewer comments, and submit revisions."}
               {role === "reviewer" && "Review assigned manuscripts, download files, and submit review decisions."}
-              {role === "admin" && "Manage all submissions, generate custom review URLs, and dispatch papers."}
             </p>
           </div>
 

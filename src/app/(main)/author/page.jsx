@@ -4,12 +4,14 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
 import DocumentPreviewer from "@/components/DocumentPreviewer";
+import { useToast } from "@/components/Toast";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
 export default function AuthorPortalPage() {
   const { data: session, isPending } = useSession();
   const user = session?.user;
+  const toast = useToast();
 
   const [activeTab, setActiveTab] = useState("papers"); // "papers" | "submit"
   const [papers, setPapers] = useState([]);
@@ -63,8 +65,7 @@ export default function AuthorPortalPage() {
       } else {
         setError(data.error || "Failed to load papers");
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError("Unable to connect to IntelliSubmit API server.");
     } finally {
       setLoading(false);
@@ -140,8 +141,7 @@ export default function AuthorPortalPage() {
       } else {
         setError(data.error || "Failed to submit paper");
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError("Network error when submitting paper.");
     } finally {
       setSubmitting(false);
@@ -178,11 +178,10 @@ export default function AuthorPortalPage() {
         setPaperToResubmit(null);
         if (user?.email) fetchAuthorPapers(user.email);
       } else {
-        alert(data.error || "Failed to resubmit paper");
+        toast.error(data.error || "Failed to resubmit paper.");
       }
-    } catch (err) {
-      console.error(err);
-      alert("Network error during resubmission.");
+    } catch {
+      toast.error("Network error during resubmission.");
     } finally {
       setResubmitting(false);
     }
@@ -407,8 +406,7 @@ export default function AuthorPortalPage() {
                         </button>
                         {paper.file?.url && (
                           <a
-                            href={paper.file.url}
-                            download={paper.file.originalName}
+                            href={`${API_BASE}/api/papers/${paper._id}/download`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors shadow-2xs"
@@ -810,8 +808,8 @@ export default function AuthorPortalPage() {
         {/* MODAL: DOCUMENT PREVIEW */}
         {previewPaper && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-4xl w-full p-6 space-y-4 shadow-2xl">
-              <div className="flex items-center justify-between">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-2xl">
+              <div className="flex items-center justify-between sticky top-0 bg-white dark:bg-zinc-900 pb-2 z-10">
                 <div>
                   <h3 className="text-base font-bold text-zinc-900 dark:text-white">
                     {previewPaper.title}
@@ -828,8 +826,9 @@ export default function AuthorPortalPage() {
                 </button>
               </div>
               <DocumentPreviewer
-                fileUrl={previewPaper.file?.url}
+                fileUrl={previewPaper.file?.url || `${API_BASE}/api/papers/${previewPaper._id}/file`}
                 fileName={previewPaper.file?.originalName}
+                downloadUrl={`${API_BASE}/api/papers/${previewPaper._id}/download`}
               />
             </div>
           </div>

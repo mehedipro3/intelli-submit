@@ -5,13 +5,22 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import DocumentPreviewer from "@/components/DocumentPreviewer";
+import { useToast } from "@/components/Toast";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
 export default function ReviewerPortalPage() {
-  const { data: session } = useSession();
+  const { data: session, isPending } = useSession();
   const user = session?.user;
   const router = useRouter();
+  const toast = useToast();
+
+  // Auth guard - only reviewers and admins can access
+  useEffect(() => {
+    if (!isPending && (!user || (user.role !== "reviewer" && user.role !== "admin"))) {
+      router.replace("/login");
+    }
+  }, [isPending, user, router]);
 
   const [tokenInput, setTokenInput] = useState("");
   const [tokenError, setTokenError] = useState("");
@@ -33,8 +42,7 @@ export default function ReviewerPortalPage() {
       } else {
         setError(data.error || "Failed to load papers.");
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError("Unable to connect to IntelliSubmit API Server.");
     } finally {
       setLoading(false);
@@ -99,6 +107,18 @@ export default function ReviewerPortalPage() {
         );
     }
   };
+
+  // Auth guard loading state
+  if (isPending || !user || (user.role !== "reviewer" && user.role !== "admin")) {
+    return (
+      <div className="min-h-screen bg-zinc-50/60 dark:bg-zinc-950 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 mx-auto border-3 border-zinc-300 border-t-emerald-600 rounded-full animate-spin" />
+          <p className="text-xs text-zinc-500">Verifying reviewer access...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50/60 dark:bg-zinc-950 py-10 px-4 sm:px-6 lg:px-8">
@@ -267,8 +287,8 @@ export default function ReviewerPortalPage() {
         {/* MODAL: DOCUMENT PREVIEW */}
         {previewPaper && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-4xl w-full p-6 space-y-4 shadow-2xl">
-              <div className="flex items-center justify-between">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-2xl">
+              <div className="flex items-center justify-between sticky top-0 bg-white dark:bg-zinc-900 pb-2 z-10">
                 <div>
                   <h3 className="text-base font-bold text-zinc-900 dark:text-white">
                     {previewPaper.title}
@@ -285,8 +305,9 @@ export default function ReviewerPortalPage() {
                 </button>
               </div>
               <DocumentPreviewer
-                fileUrl={previewPaper.file?.url}
+                fileUrl={previewPaper.file?.url || `${API_BASE}/api/papers/${previewPaper._id}/file`}
                 fileName={previewPaper.file?.originalName}
+                downloadUrl={`${API_BASE}/api/papers/${previewPaper._id}/download`}
               />
             </div>
           </div>

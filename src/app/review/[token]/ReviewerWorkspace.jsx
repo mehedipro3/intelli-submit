@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import DocumentPreviewer from "@/components/DocumentPreviewer";
+import { useToast, ConfirmModal } from "@/components/Toast";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
@@ -11,12 +12,15 @@ export default function ReviewerWorkspace({ token }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [decisionSuccess, setDecisionSuccess] = useState(null); // { message, newStatus }
+  const [decisionSuccess, setDecisionSuccess] = useState(null);
+  const toast = useToast();
 
   // Review Form State
   const [feedback, setFeedback] = useState("");
   const [reviewerName, setReviewerName] = useState("");
-  const [activeView, setActiveView] = useState("split"); // "split" | "document" | "feedback"
+
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState(null); // { decision, title, message }
 
   const fetchPaper = async () => {
     setLoading(true);
@@ -29,8 +33,7 @@ export default function ReviewerWorkspace({ token }) {
       } else {
         setError(data.error || "Invalid or expired review link.");
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError("Unable to connect to the IntelliSubmit server. Please try again.");
     } finally {
       setLoading(false);
@@ -45,17 +48,21 @@ export default function ReviewerWorkspace({ token }) {
 
   const handleSubmitReview = async (decision) => {
     if (decision === "revision_requested" && (!feedback || feedback.trim().length === 0)) {
-      alert("Please provide detailed feedback and required changes for the author.");
+      toast.warning("Please provide detailed feedback and required changes for the author.");
       return;
     }
 
+    const confirmTitle = decision === "publish" ? "Approve for Publication" : "Request Revision";
     const confirmMessage =
       decision === "publish"
         ? "Are you sure you want to approve this paper for publication? This will mark the paper as Published."
         : "Are you sure you want to request revisions from the author? Your feedback will be sent to them.";
 
-    if (!window.confirm(confirmMessage)) return;
+    setConfirmModal({ decision, title: confirmTitle, message: confirmMessage });
+  };
 
+  const executeReviewSubmission = async (decision) => {
+    setConfirmModal(null);
     setSubmitting(true);
     try {
       const res = await fetch(`${API_BASE}/api/papers/review/${token}`, {
@@ -76,12 +83,12 @@ export default function ReviewerWorkspace({ token }) {
           newStatus: data.paper.status,
           decision,
         });
+        toast.success(decision === "publish" ? "Paper approved for publication!" : "Revision request sent to author.");
       } else {
-        alert(data.error || "Failed to submit review.");
+        toast.error(data.error || "Failed to submit review.");
       }
-    } catch (err) {
-      console.error(err);
-      alert("Network error submitting review.");
+    } catch {
+      toast.error("Network error submitting review.");
     } finally {
       setSubmitting(false);
     }
@@ -122,6 +129,17 @@ export default function ReviewerWorkspace({ token }) {
 
   return (
     <div className="min-h-screen bg-zinc-50/70 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col">
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        open={!!confirmModal}
+        title={confirmModal?.title || ""}
+        message={confirmModal?.message || ""}
+        confirmLabel={confirmModal?.decision === "publish" ? "Yes, Publish" : "Yes, Request Revision"}
+        variant={confirmModal?.decision === "publish" ? "success" : "danger"}
+        onConfirm={() => executeReviewSubmission(confirmModal.decision)}
+        onCancel={() => setConfirmModal(null)}
+      />
+
       {/* Top Reviewer Bar */}
       <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-4 sm:px-6 py-3 shadow-2xs">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -152,8 +170,7 @@ export default function ReviewerWorkspace({ token }) {
           <div className="flex items-center gap-2 shrink-0">
             {paper.file?.url && (
               <a
-                href={paper.file.url}
-                download={paper.file.originalName}
+                href={`${API_BASE}/api/papers/${paper._id}/download`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors shadow-2xs"
@@ -285,8 +302,9 @@ export default function ReviewerWorkspace({ token }) {
               </span>
             </div>
             <DocumentPreviewer
-              fileUrl={paper.file?.url}
+              fileUrl={paper.file?.url || `${API_BASE}/api/papers/${paper._id}/file`}
               fileName={paper.file?.originalName}
+              downloadUrl={`${API_BASE}/api/papers/${paper._id}/download`}
               className="h-[650px]"
             />
           </div>
@@ -339,7 +357,7 @@ export default function ReviewerWorkspace({ token }) {
                   type="button"
                   onClick={() => handleSubmitReview("revision_requested")}
                   disabled={submitting}
-                  className="w-full py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -352,7 +370,7 @@ export default function ReviewerWorkspace({ token }) {
                   type="button"
                   onClick={() => handleSubmitReview("publish")}
                   disabled={submitting}
-                  className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
