@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import DocumentPreviewer from "@/components/DocumentPreviewer";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
 export default function ReviewerPortalPage() {
   const { data: session } = useSession();
