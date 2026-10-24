@@ -14,14 +14,6 @@ export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const isDashboard =
-    pathname.startsWith("/author") ||
-    pathname.startsWith("/reviewer") ||
-    pathname.startsWith("/admin");
-
-  if (isDashboard) {
-    return null;
-  }
 
   // Sync theme state with DOM / localStorage on mount
   useEffect(() => {
@@ -63,6 +55,16 @@ export default function Navbar() {
     if (userRole === "reviewer") return "/reviewer";
     return "/author";
   };
+
+  const isDashboard = Boolean(
+    pathname?.startsWith("/author") ||
+    pathname?.startsWith("/reviewer") ||
+    pathname?.startsWith("/admin")
+  );
+
+  if (isDashboard) {
+    return null;
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-100 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">

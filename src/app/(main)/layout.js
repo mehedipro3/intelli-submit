@@ -5,10 +5,11 @@ import Sidebar from "@/components/Sidebar";
 
 export default function MainLayout({ children }) {
   const pathname = usePathname();
-  const isDashboard =
-    pathname.startsWith("/author") ||
-    pathname.startsWith("/reviewer") ||
-    pathname.startsWith("/admin");
+  const isDashboard = Boolean(
+    pathname?.startsWith("/author") ||
+    pathname?.startsWith("/reviewer") ||
+    pathname?.startsWith("/admin")
+  );
 
   if (!isDashboard) {
     return children;
